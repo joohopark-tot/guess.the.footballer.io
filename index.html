@@ -44,107 +44,62 @@ td { padding:15px; border-radius:5px; font-weight:bold; min-width:90px; text-tra
 </div>
 
 <script>
-
 /////////////////////////////////////////////////////////
 // CONFIG
 /////////////////////////////////////////////////////////
 
-const API_KEY = "<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Ultimate Football Guessr 2026</title>
-
-<style>
-body { background:#0f172a; color:white; font-family:'Segoe UI',sans-serif; text-align:center; padding:20px; }
-.game-container { max-width:1100px; margin:0 auto; position:relative; }
-input { padding:12px; width:350px; border-radius:8px; border:none; font-size:16px; margin-bottom:10px; }
-button { padding:12px 24px; border:none; border-radius:8px; background:#2563eb; color:white; cursor:pointer; font-weight:bold; margin:5px; transition:0.3s; }
-button:hover { background:#3b82f6; transform:scale(1.05); }
-#suggestions { background:#1e293b; width:350px; margin:0 auto; border-radius:8px; max-height:200px; overflow-y:auto; position:absolute; left:50%; transform:translateX(-50%); z-index:100; text-align:left; }
-#suggestions div { padding:10px; cursor:pointer; border-bottom:1px solid #334155; }
-table { margin:30px auto; border-collapse:separate; border-spacing:5px; width:100%; }
-td { padding:15px; border-radius:5px; font-weight:bold; min-width:90px; text-transform:uppercase; font-size:11px; }
-.green { background:#22c55e; }
-.yellow { background:#eab308; color:black; }
-.gray { background:#374151; }
-.header-row td { background:none; color:#94a3b8; border:none; }
-</style>
-</head>
-
-<body>
-
-<div class="game-container">
-<h1>⚽ Football Guessr</h1>
-<p id="status">Loading leagues...</p>
-
-<div style="position:relative;">
-<input type="text" id="guessInput" placeholder="Start typing club..." oninput="showSuggestions()" autocomplete="off">
-<div id="suggestions"></div>
-</div>
-
-<br>
-<button onclick="checkGuess()">SUBMIT</button>
-<button onclick="initGame()">NEW GAME</button>
-
-<table id="results">
-<tr class="header-row">
-<td>CLUB</td><td>LEAGUE</td><td>COUNTRY</td><td>POSITION</td>
-</tr>
-</table>
-</div>
-
-<script>
-
-/////////////////////////////////////////////////////////
-// CONFIG
-/////////////////////////////////////////////////////////
-
-const API_KEY = "52659f674de9404d9215c8065db7f6db";
+const API_KEY = "PASTE_YOUR_API_KEY_HERE";
 
 const LEAGUES = [
-{ code:"PL", name:"Premier League", country:"England" },
-{ code:"PD", name:"La Liga", country:"Spain" },
-{ code:"BL1", name:"Bundesliga", country:"Germany" },
-{ code:"SA", name:"Serie A", country:"Italy" },
-{ code:"FL1", name:"Ligue 1", country:"France" },
-{ code:"KLU", name:"K League 1", country:"South Korea" }
+  { code: "PL", name: "Premier League", country: "England" },
+  { code: "PD", name: "La Liga", country: "Spain" },
+  { code: "BL1", name: "Bundesliga", country: "Germany" },
+  { code: "SA", name: "Serie A", country: "Italy" },
+  { code: "FL1", name: "Ligue 1", country: "France" },
+  { code: "KLU", name: "K League 1", country: "South Korea" }
 ];
 
 let clubs = [];
-let secretClub;
+let secretClub = null;
 
 /////////////////////////////////////////////////////////
-// FETCH MONTHLY DATA
+// LOAD DATA
 /////////////////////////////////////////////////////////
 
 async function loadLeagues() {
+  document.getElementById("status").innerText = "Fetching live data...";
 
-document.getElementById("status").innerText = "Fetching live data...";
+  try {
+    for (let league of LEAGUES) {
 
-for (let league of LEAGUES) {
+      const res = await fetch(
+        `https://api.football-data.org/v4/competitions/${league.code}/standings`,
+        {
+          headers: { "X-Auth-Token": API_KEY }
+        }
+      );
 
-const res = await fetch(
-`https://api.football-data.org/v4/competitions/${league.code}/standings`,
-{ headers:{ "X-Auth-Token": API_KEY } }
-);
+      const data = await res.json();
 
-const data = await res.json();
+      if (!data.standings) continue;
 
-if (!data.standings) continue;
+      data.standings[0].table.forEach(team => {
+        clubs.push({
+          name: team.team.name,
+          league: league.name,
+          country: league.country,
+          position: team.position
+        });
+      });
+    }
 
-data.standings[0].table.forEach(team => {
-clubs.push({
-name: team.team.name,
-league: league.name,
-country: league.country,
-position: team.position
-});
-});
-}
+    document.getElementById("status").innerText = "Ready!";
+    initGame();
 
-document.getElementById("status").innerText = "Ready!";
-initGame();
+  } catch (err) {
+    document.getElementById("status").innerText = "API Error";
+    console.error(err);
+  }
 }
 
 /////////////////////////////////////////////////////////
@@ -152,15 +107,17 @@ initGame();
 /////////////////////////////////////////////////////////
 
 function initGame() {
+  if (clubs.length === 0) return;
 
-secretClub = clubs[Math.floor(Math.random() * clubs.length)];
+  secretClub = clubs[Math.floor(Math.random() * clubs.length)];
 
-document.getElementById("results").innerHTML =
-`<tr class="header-row">
-<td>CLUB</td><td>LEAGUE</td><td>COUNTRY</td><td>POSITION</td>
-</tr>`;
+  document.getElementById("results").innerHTML = `
+    <tr class="header-row">
+      <td>CLUB</td><td>LEAGUE</td><td>COUNTRY</td><td>POSITION</td>
+    </tr>
+  `;
 
-document.getElementById("guessInput").value = "";
+  document.getElementById("guessInput").value = "";
 }
 
 /////////////////////////////////////////////////////////
@@ -168,25 +125,24 @@ document.getElementById("guessInput").value = "";
 /////////////////////////////////////////////////////////
 
 function showSuggestions() {
+  const val = document.getElementById("guessInput").value.toLowerCase();
+  const box = document.getElementById("suggestions");
+  box.innerHTML = "";
 
-const val = document.getElementById("guessInput").value.toLowerCase();
-const box = document.getElementById("suggestions");
-box.innerHTML = "";
+  if (!val) return;
 
-if (!val) return;
-
-clubs.filter(c => c.name.toLowerCase().includes(val))
-.slice(0,8)
-.forEach(c => {
-
-const div = document.createElement("div");
-div.textContent = c.name;
-div.onclick = () => {
-document.getElementById("guessInput").value = c.name;
-box.innerHTML = "";
-};
-box.appendChild(div);
-});
+  clubs
+    .filter(c => c.name.toLowerCase().includes(val))
+    .slice(0, 8)
+    .forEach(c => {
+      const div = document.createElement("div");
+      div.textContent = c.name;
+      div.onclick = () => {
+        document.getElementById("guessInput").value = c.name;
+        box.innerHTML = "";
+      };
+      box.appendChild(div);
+    });
 }
 
 /////////////////////////////////////////////////////////
@@ -194,195 +150,69 @@ box.appendChild(div);
 /////////////////////////////////////////////////////////
 
 function checkGuess() {
+  if (!secretClub) return;
 
-const input = document.getElementById("guessInput");
-const guess = clubs.find(c => c.name.toLowerCase() === input.value.toLowerCase());
-if (!guess) return;
+  const input = document.getElementById("guessInput");
+  const guess = clubs.find(
+    c => c.name.toLowerCase() === input.value.toLowerCase()
+  );
 
-const row = document.getElementById("results").insertRow(1);
+  if (!guess) return;
 
-function addCell(text, cls) {
-const c = row.insertCell();
-c.textContent = text;
-c.className = cls;
+  const row = document.getElementById("results").insertRow(1);
+
+  function addCell(text, cls) {
+    const cell = row.insertCell();
+    cell.textContent = text;
+    cell.className = cls;
+  }
+
+  addCell(
+    guess.name,
+    guess.name === secretClub.name ? "green" : "gray"
+  );
+
+  addCell(
+    guess.league,
+    guess.league === secretClub.league ? "green" : "gray"
+  );
+
+  addCell(
+    guess.country,
+    guess.country === secretClub.country ? "green" : "gray"
+  );
+
+  addCell(
+    guess.position,
+    guess.position === secretClub.position
+      ? "green"
+      : Math.abs(guess.position - secretClub.position) <= 3
+        ? "yellow"
+        : "gray"
+  );
+
+  if (guess.name === secretClub.name) {
+    document.getElementById("status").innerHTML =
+      `🏆 Correct! It was <b>${secretClub.name}</b>`;
+  }
+
+  input.value = "";
+  document.getElementById("suggestions").innerHTML = "";
 }
 
-addCell(guess.name, guess.name === secretClub.name ? "green" : "gray");
+/////////////////////////////////////////////////////////
+// EXPOSE FUNCTIONS TO BUTTONS
+/////////////////////////////////////////////////////////
 
-addCell(
-guess.league,
-guess.league === secretClub.league ? "green" : "gray"
-);
-
-addCell(
-guess.country,
-guess.country === secretClub.country ? "green" : "gray"
-);
-
-addCell(
-guess.position,
-guess.position === secretClub.position
-? "green"
-: (Math.abs(guess.position - secretClub.position) <= 3 ? "yellow" : "gray")
-);
-
-if (guess.name === secretClub.name) {
-document.getElementById("status").innerHTML =
-`🏆 Correct! It was <b>${secretClub.name}</b>`;
-}
-
-input.value = "";
-document.getElementById("suggestions").innerHTML = "";
-}
+window.initGame = initGame;
+window.checkGuess = checkGuess;
+window.showSuggestions = showSuggestions;
 
 /////////////////////////////////////////////////////////
 
 loadLeagues();
-
 </script>
 
-</body>
-</html>
-";
-
-const LEAGUES = [
-{ code:"PL", name:"Premier League", country:"England" },
-{ code:"PD", name:"La Liga", country:"Spain" },
-{ code:"BL1", name:"Bundesliga", country:"Germany" },
-{ code:"SA", name:"Serie A", country:"Italy" },
-{ code:"FL1", name:"Ligue 1", country:"France" },
-{ code:"KLU", name:"K League 1", country:"South Korea" }
-];
-
-let clubs = [];
-let secretClub;
-
-/////////////////////////////////////////////////////////
-// FETCH MONTHLY DATA
-/////////////////////////////////////////////////////////
-
-async function loadLeagues() {
-
-document.getElementById("status").innerText = "Fetching live data...";
-
-for (let league of LEAGUES) {
-
-const res = await fetch(
-`https://api.football-data.org/v4/competitions/${league.code}/standings`,
-{ headers:{ "X-Auth-Token": API_KEY } }
-);
-
-const data = await res.json();
-
-if (!data.standings) continue;
-
-data.standings[0].table.forEach(team => {
-clubs.push({
-name: team.team.name,
-league: league.name,
-country: league.country,
-position: team.position
-});
-});
-}
-
-document.getElementById("status").innerText = "Ready!";
-initGame();
-}
-
-/////////////////////////////////////////////////////////
-// INIT GAME
-/////////////////////////////////////////////////////////
-
-function initGame() {
-
-secretClub = clubs[Math.floor(Math.random() * clubs.length)];
-
-document.getElementById("results").innerHTML =
-`<tr class="header-row">
-<td>CLUB</td><td>LEAGUE</td><td>COUNTRY</td><td>POSITION</td>
-</tr>`;
-
-document.getElementById("guessInput").value = "";
-}
-
-/////////////////////////////////////////////////////////
-// SUGGESTIONS
-/////////////////////////////////////////////////////////
-
-function showSuggestions() {
-
-const val = document.getElementById("guessInput").value.toLowerCase();
-const box = document.getElementById("suggestions");
-box.innerHTML = "";
-
-if (!val) return;
-
-clubs.filter(c => c.name.toLowerCase().includes(val))
-.slice(0,8)
-.forEach(c => {
-
-const div = document.createElement("div");
-div.textContent = c.name;
-div.onclick = () => {
-document.getElementById("guessInput").value = c.name;
-box.innerHTML = "";
-};
-box.appendChild(div);
-});
-}
-
-/////////////////////////////////////////////////////////
-// CHECK GUESS
-/////////////////////////////////////////////////////////
-
-function checkGuess() {
-
-const input = document.getElementById("guessInput");
-const guess = clubs.find(c => c.name.toLowerCase() === input.value.toLowerCase());
-if (!guess) return;
-
-const row = document.getElementById("results").insertRow(1);
-
-function addCell(text, cls) {
-const c = row.insertCell();
-c.textContent = text;
-c.className = cls;
-}
-
-addCell(guess.name, guess.name === secretClub.name ? "green" : "gray");
-
-addCell(
-guess.league,
-guess.league === secretClub.league ? "green" : "gray"
-);
-
-addCell(
-guess.country,
-guess.country === secretClub.country ? "green" : "gray"
-);
-
-addCell(
-guess.position,
-guess.position === secretClub.position
-? "green"
-: (Math.abs(guess.position - secretClub.position) <= 3 ? "yellow" : "gray")
-);
-
-if (guess.name === secretClub.name) {
-document.getElementById("status").innerHTML =
-`🏆 Correct! It was <b>${secretClub.name}</b>`;
-}
-
-input.value = "";
-document.getElementById("suggestions").innerHTML = "";
-}
-
-/////////////////////////////////////////////////////////
-
-loadLeagues();
-
-</script>
 
 </body>
 </html>
